@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # AuthService - handles user registration, login, and JWT token generation
+  authservice:
+    build:
+      context: ./AuthService
+      dockerfile: Dockerfile
+    container_name: authservice
+    ports:
+      - "5162:8080"  # Map host port 5162 to container port 8080
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - RUNNING_IN_DOCKER=true
+      # JWT settings for token generation and validation
+      - JwtSettings__Secret=SECRET_JWT_DEMO_APPLICATION_2025_DEVELOPMENT_ONLY
+      - JwtSettings__Issuer=AuthService
+      - JwtSettings__Audience=TaskService
+      # SQLite database path inside container
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/auth.db
+    volumes:
+      # Persist SQLite database on host machine (survives container restart)
+      - auth-data:/app/data
+    networks:
+      - microservices
+
+  # TaskService - handles CRUD operations for tasks (requires JWT token)
+  taskservice:
+    build:
+      context: ./TaskService
+      dockerfile: Dockerfile
+    container_name: taskservice
+    ports:
+      - "5279:8080"  # Map host port 5279 to container port 8080
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - RUNNING_IN_DOCKER=true
+      # JWT settings must match AuthService for token validation
+      - JwtSettings__Secret=SECRET_JWT_DEMO_APPLICATION_2025_DEVELOPMENT_ONLY
+      - JwtSettings__Issuer=AuthService
+      - JwtSettings__Audience=TaskService
+      # SQLite database path inside container
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/tasks.db
+    volumes:
+      # Persist SQLite database on host machine (survives container restart)
+      - task-data:/app/data
+    networks:
+      - microservices
+    depends_on:
+      # Start AuthService first, then TaskService
+      - authservice
+
+# Named volumes for persistent database storage
+volumes:
+  auth-data:
+  task-data:
+
+# Virtual network for inter-service communication
+networks:
+  microservices:
+    driver: bridge

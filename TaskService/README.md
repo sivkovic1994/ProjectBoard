@@ -25,4 +25,5 @@ https://localhost:7088/swagger
 ## Endpoints
 - POST /api/task - Create a new task
 - GET /api/task - Get all tasks for authenticated user
+- PUT /api/task/{id} - Update a specific task
 - DELETE /api/task/{id} - Delete a specific task
