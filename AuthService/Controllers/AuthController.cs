@@ -49,9 +49,9 @@ namespace AuthService.Controllers
         [HttpGet("me")]
         public IActionResult Me()
         {
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var usernameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
-            var emailClaim = User.FindFirst(ClaimTypes.Email)?.Value;
+            string? userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            string? usernameClaim = User.FindFirst(ClaimTypes.Name)?.Value;
+            string? emailClaim = User.FindFirst(ClaimTypes.Email)?.Value;
 
             if (userIdClaim == null) return Unauthorized();
 
