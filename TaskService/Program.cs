@@ -20,6 +20,11 @@ builder.Services.AddScoped<ITaskService, TaskService.Services.TaskService>();
 
 // JWT Authentication
 var jwtSecret = builder.Configuration["JwtSettings:Secret"];
+var jwtIssuer = builder.Configuration["JwtSettings:Issuer"];
+var jwtAudience = builder.Configuration["JwtSettings:Audience"];
+
+if (string.IsNullOrEmpty(jwtSecret))
+    throw new InvalidOperationException("JWT Secret is missing in configuration");
 
 builder.Services.AddAuthentication(options =>
 {
@@ -30,39 +35,14 @@ builder.Services.AddAuthentication(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = false,
-        ValidateAudience = false,
+        ValidateIssuer = !string.IsNullOrEmpty(jwtIssuer),
+        ValidateAudience = !string.IsNullOrEmpty(jwtAudience),
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret!)),
-        ClockSkew = TimeSpan.FromMinutes(5)
-    };
-
-    options.Events = new JwtBearerEvents
-    {
-        OnMessageReceived = context =>
-        {
-            var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
-            var token = context.Token;
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            var exception = context.Exception;
-            var message = exception.Message;
-            return Task.CompletedTask;
-        },
-        OnTokenValidated = context =>
-        {
-            var claims = context.Principal?.Claims;
-            return Task.CompletedTask;
-        },
-        OnChallenge = context =>
-        {
-            var error = context.Error;
-            var errorDescription = context.ErrorDescription;
-            return Task.CompletedTask;
-        }
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        ClockSkew = TimeSpan.Zero
     };
 });
 
@@ -104,6 +84,24 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+
+        if (exceptionFeature?.Error != null)
+        {
+            logger.LogError(exceptionFeature.Error, "Unhandled exception occurred");
+        }
+
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred" });
+    });
+});
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

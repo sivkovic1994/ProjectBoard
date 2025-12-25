@@ -25,6 +25,21 @@ namespace AuthService.Services
 
         public async Task<User> CreateUserAsync(string username, string email, string password)
         {
+            username = username?.Trim() ?? string.Empty;
+            email = email?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(username))
+                throw new ArgumentException("Username cannot be empty");
+
+            if (string.IsNullOrWhiteSpace(email))
+                throw new ArgumentException("Email cannot be empty");
+
+            if (await _dbContext.Users.AnyAsync(u => u.Email == email))
+                throw new InvalidOperationException("Email already exists");
+
+            if (await _dbContext.Users.AnyAsync(u => u.Username == username))
+                throw new InvalidOperationException("Username already exists");
+
             User user = new User()
             {
                 Username = username,
@@ -40,6 +55,11 @@ namespace AuthService.Services
 
         public async Task<string?> LoginAsync(string email, string password)
         {
+            email = email?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(email))
+                return null;
+
             User? user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == email);
 
             if (user == null) return null;
@@ -89,6 +109,8 @@ namespace AuthService.Services
         private string GenerateJwt(User user)
         {
             var jwtSecret = _configuration["JwtSettings:Secret"];
+            var jwtIssuer = _configuration["JwtSettings:Issuer"];
+            var jwtAudience = _configuration["JwtSettings:Audience"];
 
             if (string.IsNullOrEmpty(jwtSecret))
                 throw new InvalidOperationException("JWT Secret is not configured.");
@@ -99,11 +121,13 @@ namespace AuthService.Services
             var claims = new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
-                new Claim(JwtRegisteredClaimNames.Email, user.Email)
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim(ClaimTypes.Email, user.Email)
             };
 
             var token = new JwtSecurityToken(
+                issuer: jwtIssuer,
+                audience: jwtAudience,
                 claims: claims,
                 expires: DateTime.UtcNow.AddHours(2),
                 signingCredentials: creds

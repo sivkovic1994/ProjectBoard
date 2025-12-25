@@ -1,11 +1,12 @@
-﻿using TaskService.Models;
+﻿using TaskService.DTOs;
 
 namespace TaskService.Services
 {
     public interface ITaskService
     {
-        Task<TaskItem> CreateTaskAsync(TaskItem task, int userId);
-        Task<List<TaskItem>> GetUserTasksAsync(int userId);
+        Task<TaskResponseDTO> CreateTaskAsync(CreateTaskDTO dto, int userId);
+        Task<List<TaskResponseDTO>> GetUserTasksAsync(int userId);
+        Task<TaskResponseDTO?> UpdateTaskAsync(int taskId, UpdateTaskDTO dto, int userId);
         Task<bool> DeleteTaskAsync(int taskId, int userId);
     }
 }

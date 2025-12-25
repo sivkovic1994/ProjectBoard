@@ -17,6 +17,12 @@ builder.Services.AddScoped<IUserService, UserService>();
 
 // JWT Authentication
 var jwtSecret = builder.Configuration["JwtSettings:Secret"];
+var jwtIssuer = builder.Configuration["JwtSettings:Issuer"];
+var jwtAudience = builder.Configuration["JwtSettings:Audience"];
+
+if (string.IsNullOrEmpty(jwtSecret))
+    throw new InvalidOperationException("JWT Secret is missing in configuration");
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -26,12 +32,14 @@ builder.Services.AddAuthentication(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
     {
-        ValidateIssuer = false,
-        ValidateAudience = false,
+        ValidateIssuer = !string.IsNullOrEmpty(jwtIssuer),
+        ValidateAudience = !string.IsNullOrEmpty(jwtAudience),
+        ValidIssuer = jwtIssuer,
+        ValidAudience = jwtAudience,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret!)),
-        ClockSkew = TimeSpan.FromMinutes(5)
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+        ClockSkew = TimeSpan.Zero
     };
 });
 
@@ -75,6 +83,24 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+
+        if (exceptionFeature?.Error != null)
+        {
+            logger.LogError(exceptionFeature.Error, "Unhandled exception occurred");
+        }
+
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred" });
+    });
+});
 
 app.UseHttpsRedirection();
 app.UseAuthentication();

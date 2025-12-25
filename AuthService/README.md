@@ -19,7 +19,7 @@ Authentication microservice built with ASP.NET Core.
 1. Update database:
 2. Run the app
 3. Open Swagger at:
-https://localhost:5001/swagger
+https://localhost:7078/swagger
 
 ## Endpoints
 - POST /api/auth/register
