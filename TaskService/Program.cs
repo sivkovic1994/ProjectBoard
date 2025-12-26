@@ -18,6 +18,9 @@ builder.Services.AddDbContext<TaskDbContext>(options => options.UseSqlite(builde
 // DI
 builder.Services.AddScoped<ITaskService, TaskService.Services.TaskService>();
 
+// Health Checks
+builder.Services.AddHealthChecks().AddDbContextCheck<TaskDbContext>("database");
+
 // JWT Authentication
 var jwtSecret = builder.Configuration["JwtSettings:Secret"];
 var jwtIssuer = builder.Configuration["JwtSettings:Issuer"];
@@ -121,6 +124,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+app.MapHealthChecks("/health");
 
 app.MapControllers();
 app.Run();

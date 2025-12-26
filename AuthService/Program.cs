@@ -15,6 +15,9 @@ builder.Services.AddDbContext<AuthDbContext>(options => options.UseSqlite(builde
 // DI
 builder.Services.AddScoped<IUserService, UserService>();
 
+// Health Checks
+builder.Services.AddHealthChecks().AddDbContextCheck<AuthDbContext>("database");
+
 // JWT Authentication
 var jwtSecret = builder.Configuration["JwtSettings:Secret"];
 var jwtIssuer = builder.Configuration["JwtSettings:Issuer"];
@@ -120,6 +123,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+app.MapHealthChecks("/health");
 
 app.MapControllers();
 app.Run();
