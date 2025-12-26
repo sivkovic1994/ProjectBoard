@@ -1,4 +1,4 @@
-using AuthService.Data;
+﻿using AuthService.Data;
 using AuthService.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -8,12 +8,41 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var loggerFactory = LoggerFactory.Create(logging => logging.AddConsole());
+var logger = loggerFactory.CreateLogger<Program>();
+
 // Add services
 builder.Services.AddControllers();
 builder.Services.AddDbContext<AuthDbContext>(options => options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // DI
 builder.Services.AddScoped<IUserService, UserService>();
+
+// Redis Distributed Cache
+string? redisConnection = builder.Configuration["Redis:ConnectionString"];
+
+if (!string.IsNullOrEmpty(redisConnection))
+{
+    try
+    {
+        builder.Services.AddStackExchangeRedisCache(options =>
+        {
+            options.Configuration = redisConnection;
+            options.InstanceName = builder.Configuration["Redis:InstanceName"];
+        });
+        logger.LogInformation($"Redis caching enabled: {redisConnection}");
+    }
+    catch (Exception ex)
+    {
+        builder.Services.AddDistributedMemoryCache();
+        logger.LogWarning($"Warning: Redis connection failed: {ex.Message}. Using in-memory cache.");
+    }
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+    logger.LogWarning("Warning: Redis not configured, using in-memory cache");
+}
 
 // Health Checks
 builder.Services.AddHealthChecks().AddDbContextCheck<AuthDbContext>("database");
@@ -98,7 +127,6 @@ app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
     {
-        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
         var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
 
         if (exceptionFeature?.Error != null)

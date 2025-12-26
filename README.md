@@ -1,15 +1,17 @@
 # ProjectBoard - Microservices Demo
 
-.NET 8 microservices application with JWT authentication and Docker support.
+.NET 8 microservices application with JWT authentication, Redis caching and Docker support.
 
 ## Architecture
 - **AuthService** - User registration, login, JWT token generation
 - **TaskService** - CRUD operations for tasks (requires JWT authentication)
+- **Redis** - Distributed cache for authentication
 
 ## Tech Stack
 - .NET 8 Web API
 - Entity Framework Core + SQLite
 - JWT Authentication
+- Redis (Distributed Caching)
 - Docker & Docker Compose
 - Swagger/OpenAPI
 
@@ -21,7 +23,7 @@ Access services: AuthService http://localhost:5162/swagger | TaskService http://
 Stop services:
 docker-compose down
 
-Reset databases:
+Reset databases and cache:
 docker-compose down -v
 
 ## 🛠️ Run from Visual Studio
@@ -48,15 +50,28 @@ POST http://localhost:5279/api/task {"title": "Task 1", "description": "This is 
 **5. Get all tasks (TaskService)**
 GET http://localhost:5279/api/task
 
+## 🔍 Verify Redis Cache
+
+**Access Redis CLI:**
+docker exec -it projectboard-redis redis-cli
+
+**View all cached keys:**
+KEYS * 
+
+**View user data (replace with key from above):**
+HGET AuthService_user_email_test@example.com data
+
 ## 📝 API Endpoints
 
 **AuthService (port 5162)**
 - POST /api/auth/register - Register new user
 - POST /api/auth/login - Login and get JWT token
 - GET /api/auth/me - Get current user info (protected)
+- GET /health - Health check endpoint
 
 **TaskService (port 5279)**
 - POST /api/task - Create task (protected)
 - GET /api/task - Get all user tasks (protected)
 - PUT /api/task/{id} - Update task (protected)
 - DELETE /api/task/{id} - Delete task (protected)
+- GET /health - Health check endpoint

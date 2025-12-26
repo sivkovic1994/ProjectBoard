@@ -2,6 +2,7 @@
 using AuthService.Models;
 using Microsoft.AspNetCore.Cryptography.KeyDerivation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -14,11 +15,15 @@ namespace AuthService.Services
     {
         private readonly AuthDbContext _dbContext;
         private readonly IConfiguration _configuration;
+        private readonly IDistributedCache _cache;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(AuthDbContext dbContext, IConfiguration configuration)
+        public UserService(AuthDbContext dbContext, IConfiguration configuration, IDistributedCache cache, ILogger<UserService> logger)
         {
             _dbContext = dbContext;
             _configuration = configuration;
+            _cache = cache;
+            _logger = logger;
         }
 
         #region Public Methods
@@ -60,11 +65,37 @@ namespace AuthService.Services
             if (string.IsNullOrWhiteSpace(email))
                 return null;
 
-            User? user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == email);
+            string cacheKey = $"user_email_{email}";
+            var cachedUserJson = await _cache.GetStringAsync(cacheKey);
+
+            User? user;
+
+            if (!string.IsNullOrEmpty(cachedUserJson))
+            {
+                user = System.Text.Json.JsonSerializer.Deserialize<User>(cachedUserJson);
+                _logger.LogInformation("User fetched from cache: {Email}", email);
+            }
+            else
+            {
+                user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+                if (user != null)
+                {
+                    var cacheOptions = new DistributedCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                    };
+
+                    await _cache.SetStringAsync(cacheKey, System.Text.Json.JsonSerializer.Serialize(user), cacheOptions);
+                    _logger.LogInformation("User fetched from database and cached: {Email}", email);
+                }
+            }
 
             if (user == null) return null;
 
             if (!VerifyPassword(password, user.PasswordHash)) return null;
+
+            _logger.LogInformation("User {Email} logged in successfully", email);
 
             return GenerateJwt(user);
         }

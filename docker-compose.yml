@@ -1,6 +1,21 @@
 version: '3.8'
 
 services:
+  # Redis - Distributed cache for AuthService (stores user data for faster login)
+  redis:
+    image: redis:alpine
+    container_name: projectboard-redis
+    ports:
+     - "6379:6379"
+    networks:
+     - projectboard-network
+    # Check if Redis is responding to PING command
+    healthcheck:
+     test: ["CMD", "redis-cli", "ping"]
+     interval: 10s
+     timeout: 3s
+     retries: 3
+     start_period: 5s
   # AuthService - handles user registration, login, and JWT token generation
   authservice:
     build:
@@ -18,11 +33,13 @@ services:
       - JwtSettings__Audience=TaskService
       # SQLite database path inside container
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/auth.db
+      - Redis__ConnectionString=redis:6379
+      - Redis__InstanceName=AuthService_
     volumes:
       # Persist SQLite database on host machine (survives container restart)
       - auth-data:/app/data
     networks:
-      - microservices
+      - projectboard-network
 
   # TaskService - handles CRUD operations for tasks (requires JWT token)
   taskservice:
@@ -45,7 +62,7 @@ services:
       # Persist SQLite database on host machine (survives container restart)
       - task-data:/app/data
     networks:
-      - microservices
+      - projectboard-network
     depends_on:
       # Start AuthService first, then TaskService
       - authservice
@@ -57,5 +74,5 @@ volumes:
 
 # Virtual network for inter-service communication
 networks:
-  microservices:
+  projectboard-network:
     driver: bridge
